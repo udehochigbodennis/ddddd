@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Orphanage Management System — Demo</title>
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#fff; --muted:#6b7280; --accent:#0ea5a4; --accent-2:#0369a1;
+      --radius:12px; --shadow: 0 6px 18px rgba(10,10,10,0.06);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:#0f172a;min-height:100vh}
+
+    /* Layout */
+    .app{display:grid;grid-template-columns:260px 1fr;gap:20px;padding:20px;max-width:1200px;margin:20px auto}
+    .sidebar{background:linear-gradient(180deg,#fff, #f8fafc);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);height:calc(100vh - 80px);position:sticky;top:20px;overflow:auto}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    .brand h1{font-size:16px;margin:0}
+    .nav{margin-top:8px}
+    .nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+    .nav button.active{background:rgba(6,182,212,0.08);color:var(--accent-2);font-weight:600}
+
+    .main{padding:20px;background:transparent}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+    .search{flex:1;display:flex;gap:8px}
+    .search input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #e6eef4;background:#fff}
+    .actions{display:flex;gap:8px}
+    .btn{padding:10px 12px;border-radius:10px;border:0;cursor:pointer;background:var(--accent);color:#fff}
+    .btn.ghost{background:transparent;color:var(--accent-2);border:1px solid rgba(3,105,161,0.08)}
+
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+    .card h2{margin:0 0 8px 0;font-size:16px}
+
+    /* table */
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .small{font-size:13px;color:var(--muted)}
+
+    /* responsive */
+    @media (max-width:900px){
+      .app{grid-template-columns:1fr;padding:12px}
+      .sidebar{display:flex;flex-direction:row;height:auto;position:relative;width:100%;overflow:auto}
+      .main{padding:12px}
+      .grid{grid-template-columns:1fr}
+      .sidebar .nav{display:flex;gap:6px}
+      .nav button{flex:1;padding:8px}
+    }
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center;padding:20px}
+    .modal{width:100%;max-width:720px;background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+    .form-row{display:flex;gap:10px}
+    .form-row .col{flex:1}
+    label{display:block;margin-bottom:6px;font-size:13px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef4;background:#fff}
+
+    /* small helpers */
+    .muted{color:var(--muted)}
+    .flex{display:flex;align-items:center;gap:8px}
+    .pill{background:#eef2f7;padding:6px 10px;border-radius:999px;font-weight:600}
+    .table-actions button{margin-right:6px}
+
+    footer{max-width:1200px;margin:10px auto;text-align:center;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand">
+        <div class="logo">OM</div>
+        <div>
+          <h1>OrphanageMS</h1>
+          <div class="small muted">Manage children, donors & staff</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="mainNav">
+        <button data-view="dashboard" class="active">🏠 Dashboard</button>
+        <button data-view="children">👶 Children</button>
+        <button data-view="donors">💝 Donors & Sponsorships</button>
+        <button data-view="staff">👩‍🏫 Staff</button>
+        <button data-view="inventory">📦 Inventory</button>
+        <button data-view="events">📅 Events</button>
+        <button data-view="reports">📊 Reports</button>
+        <div style="height:12px"></div>
+        <button data-view="settings" class="ghost">⚙️ Settings</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search children, donors, staff..." />
+          <div class="actions"><button class="btn" id="addBtn">+ Add</button></div>
+        </div>
+        <div class="flex">
+          <div class="pill">Active: <strong id="statChildren">0</strong></div>
+          <div class="pill">Donors: <strong id="statDonors">0</strong></div>
+        </div>
+      </div>
+
+      <section id="viewArea">
+        <!-- Dashboard view -->
+        <div id="dashboard" class="view">
+          <div class="grid">
+            <div class="card">
+              <h2>Recent Children</h2>
+              <table id="childrenTable">
+                <thead><tr><th>Name</th><th>Age</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <aside>
+              <div class="card">
+                <h2>Quick Actions</h2>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+                  <button class="btn" id="quickAddChild">Add Child</button>
+                  <button class="btn ghost" id="quickAddDonation">Record Donation</button>
+                  <button class="btn ghost" id="quickEvent">New Event</button>
+                </div>
+              </div>
+
+              <div class="card" style="margin-top:12px">
+                <h2>Summary</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+                  <div class="card" style="padding:12px"><strong id="totalChildren">0</strong><div class="small muted">Total Children</div></div>
+                  <div class="card" style="padding:12px"><strong id="totalDonations">₦0</strong><div class="small muted">Total Donations</div></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- Children view -->
+        <div id="children" class="view" style="display:none">
+          <div class="card">
+            <h2>Children</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div class="small muted">List of registered children</div>
+              <div><button class="btn" id="addChildBtn">New Child</button></div>
+            </div>
+
+            <table id="childrenList">
+              <thead><tr><th>Name</th><th>DOB</th><th>Gender</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Donors view -->
+        <div id="donors" class="view" style="display:none">
+          <div class="card">
+            <h2>Donors & Sponsorships</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div class="small muted">Donations received and active sponsorships</div>
+              <div><button class="btn" id="addDonorBtn">New Donation</button></div>
+            </div>
+
+            <table id="donorsList">
+              <thead><tr><th>Donor</th><th>Type</th><th>Amount</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Staff view -->
+        <div id="staff" class="view" style="display:none">
+          <div class="card">
+            <h2>Staff</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div class="small muted">Active staff members</div>
+            </div>
+            <table id="staffList">
+              <thead><tr><th>Name</th><th>Position</th><th>Hire Date</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Inventory view -->
+        <div id="inventory" class="view" style="display:none">
+          <div class="card">
+            <h2>Inventory</h2>
+            <table id="inventoryList"><thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <!-- Events view -->
+        <div id="events" class="view" style="display:none">
+          <div class="card">
+            <h2>Events</h2>
+            <table id="eventsList"><thead><tr><th>Event</th><th>Date</th><th>Location</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <!-- Reports view -->
+        <div id="reports" class="view" style="display:none">
+          <div class="card">
+            <h2>Reports</h2>
+            <div class="small muted">Export dashboards, health and finance reports</div>
+            <div style="margin-top:12px">
+              <button class="btn" id="exportCSV">Export Children CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings view -->
+        <div id="settings" class="view" style="display:none">
+          <div class="card">
+            <h2>Settings</h2>
+            <div class="small muted">Basic system settings (demo)</div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3 id="modalTitle">Add Child</h3>
+      <div style="margin-top:10px">
+        <div class="form-row">
+          <div class="col"><label>First Name</label><input id="cFirst" /></div>
+          <div class="col"><label>Last Name</label><input id="cLast" /></div>
+        </div>
+        <div class="form-row" style="margin-top:8px">
+          <div class="col"><label>Date of Birth</label><input id="cDOB" type="date" /></div>
+          <div class="col"><label>Gender</label><select id="cGender"><option value="male">Male</option><option value="female">Female</option></select></div>
+        </div>
+        <div style="margin-top:8px"><label>Notes</label><textarea id="cNotes" rows="3"></textarea></div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn ghost" id="closeModal">Cancel</button>
+          <button class="btn" id="saveChild">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>OrphanageMS — demo UI • Built for demo & planning</footer>
+
+  <script>
+    // Sample in-memory data store (demo only)
+    const state = {
+      children: [
+        {id:1,first:'Amina',last:'Ibrahim',dob:'2016-04-12',gender:'female',status:'active'},
+        {id:2,first:'Tunde',last:'Okoye',dob:'2014-11-06',gender:'male',status:'active'},
+        {id:3,first:'Grace',last:'Eze',dob:'2012-02-22',gender:'female',status:'fostered'},
+      ],
+      donations:[
+        {id:1,donor:'GoodHeart Org',type:'cash',amount:50000,date:'2025-10-01'},
+        {id:2,donor:'Jane Doe',type:'material',amount:0,date:'2025-10-17',desc:'Clothes & books'},
+      ],
+      staff:[{id:1,name:'Bukola Yusuf',pos:'Manager',hire:'2020-05-12'}],
+      inventory:[{id:1,item:'Rice',category:'Food',qty:120,unit:'kg'}],
+      events:[{id:1,name:'Back-to-school',date:'2025-11-05',loc:'Community Hall'}]
+    };
+
+    // Utilities
+    const q=(s,el=document)=>el.querySelector(s);
+    const qa=(s,el=document)=>Array.from(el.querySelectorAll(s));
+
+    // Renderers
+    function renderChildrenTable(){
+      const tbody=q('#childrenTable tbody'); tbody.innerHTML='';
+      const kids = state.children.slice(0,8);
+      kids.forEach(k=>{
+        const age = calcAge(k.dob);
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${k.first} ${k.last}</td><td class="small">${age} yrs</td><td class="small">${k.status}</td><td class="table-actions"><button class='btn ghost' data-id='${k.id}' onclick='viewChild(${k.id})'>View</button></td>`;
+        tbody.appendChild(tr);
+      })
+      q('#totalChildren').textContent = state.children.length;
+      q('#statChildren').textContent = state.children.filter(c=>c.status==='active').length;
+    }
+
+    function renderChildrenList(){
+      const tbody=q('#childrenList tbody'); tbody.innerHTML='';
+      state.children.forEach(k=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${k.first} ${k.last}</td><td>${k.dob || '-'}</td><td>${k.gender}</td><td>${k.status}</td><td><button class='btn ghost' onclick='editChild(${k.id})'>Edit</button></td>`;
+        tbody.appendChild(tr);
+      })
+    }
+
+    function renderDonors(){
+      const tbody=q('#donorsList tbody'); tbody.innerHTML='';
+      state.donations.forEach(d=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${d.donor}</td><td>${d.type}</td><td>${d.amount ? '₦'+d.amount.toLocaleString() : '-'}</td><td>${d.date}</td><td><button class='btn ghost' onclick='editDonation(${d.id})'>Edit</button></td>`;
+        tbody.appendChild(tr);
+      })
+      const total = state.donations.reduce((s,x)=>s+(x.amount||0),0);
+      q('#totalDonations').textContent = '₦'+total.toLocaleString();
+      q('#statDonors').textContent = state.donations.length;
+    }
+
+    function renderStaff(){
+      const tbody=q('#staffList tbody'); tbody.innerHTML='';
+      state.staff.forEach(s=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${s.name}</td><td>${s.pos}</td><td>${s.hire}</td><td></td>`;
+        tbody.appendChild(tr);
+      })
+    }
+
+    function renderInventory(){
+      const tbody=q('#inventoryList tbody'); tbody.innerHTML='';
+      state.inventory.forEach(i=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i.item}</td><td>${i.category}</td><td>${i.qty}</td><td>${i.unit}</td>`;tbody.appendChild(tr)})
+    }
+
+    function renderEvents(){
+      const tbody=q('#eventsList tbody'); tbody.innerHTML='';
+      state.events.forEach(e=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${e.name}</td><td>${e.date}</td><td>${e.loc}</td>`;tbody.appendChild(tr)})
+    }
+
+    function calcAge(dob){ if(!dob) return '-'; const diff = new Date() - new Date(dob); return Math.floor(diff/31557600000); }
+
+    // Navigation
+    qa('.nav button').forEach(b=>b.addEventListener('click',()=>{
+      qa('.nav button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      const view = b.dataset.view;
+      showView(view);
+    }))
+
+    function showView(view){ qa('.view').forEach(v=>v.style.display='none'); const el=q('#'+view); if(el) el.style.display='block';
+      // render when showing
+      if(view==='dashboard'){renderChildrenTable(); renderDonors();}
+      if(view==='children'){renderChildrenList();}
+      if(view==='donors'){renderDonors();}
+      if(view==='staff'){renderStaff();}
+      if(view==='inventory'){renderInventory();}
+      if(view==='events'){renderEvents();}
+      if(view==='reports'){ /* nothing */ }
+    }
+
+    // Modal handling
+    const modal=q('#modalBackdrop');
+    q('#addBtn').addEventListener('click',()=>openModal('Add Child'));
+    q('#quickAddChild').addEventListener('click',()=>openModal('Add Child'));
+    q('#addChildBtn').addEventListener('click',()=>openModal('Add Child'));
+
+    function openModal(title, data){ q('#modalTitle').textContent = title; modal.style.display='flex'; if(data){ q('#cFirst').value=data.first; q('#cLast').value=data.last; q('#cDOB').value=data.dob; q('#cGender').value=data.gender; q('#cNotes').value=data.notes||'';} else {q('#cFirst').value='';q('#cLast').value='';q('#cDOB').value='';q('#cGender').value='male';q('#cNotes').value='';} }
+    q('#closeModal').addEventListener('click',()=>modal.style.display='none');
+
+    q('#saveChild').addEventListener('click',()=>{
+      const f=q('#cFirst').value.trim(); const l=q('#cLast').value.trim(); const dob=q('#cDOB').value; const g=q('#cGender').value; const notes=q('#cNotes').value;
+      if(!f||!l){alert('Please provide a name'); return}
+      const id = state.children.length ? Math.max(...state.children.map(c=>c.id))+1 : 1;
+      state.children.push({id,first:f,last:l,dob,gender:g,status:'active',notes});
+      modal.style.display='none'; renderChildrenList(); renderChildrenTable();
+    });
+
+    // Quick donation modal (simple prompt demo)
+    q('#quickAddDonation').addEventListener('click',()=>{
+      const donor = prompt('Donor name'); if(!donor) return; const amt = parseFloat(prompt('Amount in Naira (0 if material)')||0);
+      const id = state.donations.length ? Math.max(...state.donations.map(d=>d.id))+1 : 1; state.donations.push({id,donor,type: amt>0?'cash':'material',amount:amt,date:new Date().toISOString().slice(0,10)}); renderDonors(); renderChildrenTable();
+    })
+
+    // Misc actions
+    q('#exportCSV').addEventListener('click',()=>{
+      const rows = [['id','first_name','last_name','dob','gender','status']].concat(state.children.map(c=>[c.id,c.first,c.last,c.dob,c.gender,c.status]));
+      const csv = rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download='children.csv'; a.click(); URL.revokeObjectURL(url);
+    })
+
+    // small helpers
+    window.viewChild = function(id){ const kid = state.children.find(c=>c.id===id); alert('Child: '+kid.first+' '+kid.last+' (DOB: '+(kid.dob||'-')+')') }
+    window.editChild = function(id){ const kid = state.children.find(c=>c.id===id); openModal('Edit Child',kid); }
+    window.editDonation = function(id){ const d = state.donations.find(x=>x.id===id); const donor = prompt('Donor',d.donor); if(donor) d.donor=donor; renderDonors(); }
+
+    // search
+    q('#globalSearch').addEventListener('input',(e)=>{
+      const qstr=e.target.value.toLowerCase(); qa('table tbody tr').forEach(tr=>{ tr.style.display = tr.textContent.toLowerCase().includes(qstr) ? '' : 'none' })
+    })
+
+    // initial render
+    renderChildrenTable(); renderDonors(); renderStaff(); renderInventory(); renderEvents();
+  </script>
+</body>
+</html>
